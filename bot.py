@@ -157,16 +157,18 @@ async def buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 def main():
     if not TOKEN:
-        raise RuntimeError("BOT_TOKEN environment variable is missing")
+        raise RuntimeError("BOT_TOKEN is missing")
+
+    webhook_secret = os.getenv("WEBHOOK_SECRET")
+    render_url = os.getenv("RENDER_EXTERNAL_URL")
+    port = int(os.getenv("PORT", "10000"))
+
+    if not webhook_secret or not render_url:
+        raise RuntimeError("Webhook environment variables are missing")
 
     setup_db()
-    app = (
-        Application.builder()
-        .token(TOKEN)
-        .proxy("http://proxy.server:3128")
-        .get_updates_proxy("http://proxy.server:3128")
-        .build()
-        )
+
+    app = Application.builder().token(TOKEN).build()
 
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("stats", stats))
@@ -176,7 +178,15 @@ def main():
     app.add_handler(MessageHandler(filters.ALL & ~filters.COMMAND, handle_message))
 
     print("Kaptaan Choudhary Bot is running!")
-    app.run_polling()
+
+    app.run_webhook(
+        listen="0.0.0.0",
+        port=port,
+        url_path=webhook_secret,
+        webhook_url=f"{render_url}/{webhook_secret}",
+        secret_token=webhook_secret
+    )
+
 
 if __name__ == "__main__":
     main()
