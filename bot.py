@@ -13,7 +13,7 @@ ADMIN_ID = 1105772687
 TOKEN = os.getenv("BOT_TOKEN")
 
 SUPABASE_URL = os.getenv("SUPABASE_URL", "").rstrip("/")
-print("URL variable check:", repr(os.getenv("SUPABASE_URL")))
+print("SUPABASE variable names:", [repr(k) for k in os.environ if "SUPABASE" in k.upper()])
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 
 def supabase_headers():
