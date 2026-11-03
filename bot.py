@@ -5,6 +5,7 @@ import uuid
 import httpx
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.error import RetryAfter
 from telegram.ext import (
     Application, CommandHandler, MessageHandler,
     CallbackQueryHandler, ContextTypes, filters
@@ -59,11 +60,31 @@ async def save_user(uid):
 
 
 async def get_users():
-    data = await db_request(
-        "GET", "users",
-        params={"select": "id"}
-    )
-    return [row["id"] for row in data or []]
+    users = []
+    offset = 0
+    batch_size = 1000
+
+    while True:
+        data = await db_request(
+            "GET", "users",
+            params={
+                "select": "id",
+                "order": "id.asc",
+                "limit": batch_size,
+                "offset": offset
+            }
+        )
+
+        if not data:
+            break
+
+        users.extend(row["id"] for row in data)
+        offset += batch_size
+
+        if len(data) < batch_size:
+            break
+
+    return users
 
 
 # ---------------- TOSS / MATCH DATABASE ----------------
@@ -748,7 +769,47 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
 
+# ---------------- BATCH BROADCAST SENDER ----------------
 
+async def send_broadcast(context, message_id, users):
+    sent = 0
+    failed = 0
+    total = len(users)
+
+    for index, uid in enumerate(users, start=1):
+        while True:
+            try:
+                await context.bot.copy_message(
+                    chat_id=uid,
+                    from_chat_id=ADMIN_ID,
+                    message_id=message_id
+                )
+                sent += 1
+                break
+
+            except RetryAfter as e:
+                wait_time = e.retry_after
+                if hasattr(wait_time, "total_seconds"):
+                    wait_time = wait_time.total_seconds()
+                await asyncio.sleep(float(wait_time) + 1)
+
+            except Exception:
+                failed += 1
+                break
+
+        await asyncio.sleep(0.05)
+
+        if index % 100 == 0:
+            await asyncio.sleep(2)
+
+    await context.bot.send_message(
+        ADMIN_ID,
+        f"📊 BROADCAST REPORT\n\n"
+        f"👥 Total Users: {total}\n"
+        f"✅ Sent: {sent}\n"
+        f"❌ Failed: {failed}"
+    )
+    
 # ---------------- BUTTONS ----------------
 
 async def buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -839,37 +900,31 @@ async def buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.edit_message_text("Broadcast cancelled.")
         return
 
-    if data == "confirm_broadcast":
+        if data == "confirm_broadcast":
         message_id = context.user_data.pop("pending_broadcast", None)
 
         if not message_id:
             await query.edit_message_text("No pending broadcast.")
             return
 
-        await query.edit_message_text("Broadcast started...")
+        await query.edit_message_text("🚀 Broadcast started...")
 
-        users = await get_users()
-        sent = failed = 0
+        try:
+            users = await get_users()
 
-        for uid in users:
-            try:
-                await context.bot.copy_message(
-                    chat_id=uid,
-                    from_chat_id=ADMIN_ID,
-                    message_id=message_id
-                )
-                sent += 1
-            except Exception:
-                failed += 1
+            await send_broadcast(
+                context,
+                message_id,
+                users
+            )
 
-            await asyncio.sleep(0.05)
+        except Exception as e:
+            await context.bot.send_message(
+                ADMIN_ID,
+                f"❌ Broadcast error: {e}"
+            )
 
-        await context.bot.send_message(
-            ADMIN_ID,
-            f"📊 BROADCAST REPORT\n\n"
-            f"✅ Sent: {sent}\n"
-            f"❌ Failed: {failed}"
-        )
+        return
 
 
 # ---------------- MAIN ----------------
