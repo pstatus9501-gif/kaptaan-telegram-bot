@@ -900,7 +900,7 @@ async def buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.edit_message_text("Broadcast cancelled.")
         return
 
-        if data == "confirm_broadcast":
+    if data == "confirm_broadcast":
         message_id = context.user_data.pop("pending_broadcast", None)
 
         if not message_id:
