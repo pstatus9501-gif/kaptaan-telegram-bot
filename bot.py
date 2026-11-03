@@ -203,8 +203,11 @@ def main():
     if not TOKEN:
         raise RuntimeError("BOT_TOKEN is missing")
 
-    if not SUPABASE_URL or not SUPABASE_KEY:
-        raise RuntimeError("SUPABASE_URL or SUPABASE_KEY is missing")
+    print("SUPABASE_URL loaded:", bool(SUPABASE_URL))
+print("SUPABASE_KEY loaded:", bool(SUPABASE_KEY))
+
+if not SUPABASE_URL or not SUPABASE_KEY:
+    raise RuntimeError("SUPABASE_URL or SUPABASE_KEY is missing")
 
     webhook_secret = os.getenv("WEBHOOK_SECRET")
     render_url = os.getenv("RENDER_EXTERNAL_URL")
