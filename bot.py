@@ -914,7 +914,7 @@ async def buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if request["cycle_id"] != current_cycle:
                 await update_request_status(request_id, "expired")
                 await query.edit_message_text(
-                    "âš ï¸ This request belongs to an old match. Approval expired."
+                    "Ã¢Å¡ Ã¯Â¸Â This request belongs to an old match. Approval expired."
                 )
                 return
 
