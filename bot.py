@@ -283,7 +283,7 @@ async def handle_join_request(update: Update, context: ContextTypes.DEFAULT_TYPE
     bot_info = await context.bot.get_me()
     start_link = f"https://t.me/{bot_info.username}?start=welcome"
 
-        welcome_text = (
+    welcome_text = (
         "\U0001F44B WELCOME TO KAPTAAN CHOUDHARY! \U0001F451\n\n"
         "Congratulations! Your channel join request is being approved. \u2705\n\n"
         "\U0001F3CF Welcome to our cricket community!\n\n"
