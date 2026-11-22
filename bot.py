@@ -1,18 +1,22 @@
-
 import os
 import asyncio
 import uuid
 import httpx
+import logging
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.error import RetryAfter
 from telegram.ext import (
     Application, CommandHandler, MessageHandler,
-    CallbackQueryHandler, ContextTypes, filters
+    CallbackQueryHandler, ChatJoinRequestHandler,
+    ContextTypes, filters
 )
 
 ADMIN_ID = 1105772687
 TOKEN = os.getenv("BOT_TOKEN")
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 SUPABASE_URL = os.getenv("SUPABASE_URL", "").rstrip("/")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
@@ -254,10 +258,72 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     uid = update.effective_user.id
     await save_user(uid)
 
+    if context.args and context.args[0] == "welcome":
+        await update.message.reply_text(
+            "âœ… You're connected with Kaptaan Choudhary! ðŸ\n\n"
+            "You can now receive personal updates and important announcements here. "
+            "Send Toss or Match whenever you need the latest update."
+        )
+        return
+
     await update.message.reply_text(
-        "Welcome to Kaptaan Choudhary! 🏏\n"
+        "Welcome to Kaptaan Choudhary! ðŸ\n"
         "Send Toss or Match to request the latest update."
     )
+
+
+# ---------------- CHANNEL JOIN REQUESTS ----------------
+
+async def handle_join_request(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    join_request = update.chat_join_request
+    if not join_request:
+        return
+
+    user = join_request.from_user
+    bot_info = await context.bot.get_me()
+    start_link = f"https://t.me/{bot_info.username}?start=welcome"
+
+    welcome_text = (
+        "ðŸ‘‹ WELCOME TO KAPTAAN CHOUDHARY! ðŸ‘‘\n\n"
+        "Congratulations! Your channel join request is being approved. âœ…\n\n"
+        "ðŸ Welcome to our cricket community!\n\n"
+        "To receive personal updates, match notifications and important announcements, "
+        "please start our official bot using the button below.\n\n"
+        "â¤ï¸ Thank you for joining us!\n\n"
+        "â€“ TEAM KAPTAAN CHOUDHARY"
+    )
+
+    keyboard = InlineKeyboardMarkup([[
+        InlineKeyboardButton("ðŸš€ START NOW", url=start_link)
+    ]])
+
+    # Telegram provides user_chat_id temporarily for contacting a join requester.
+    # Send the DM before processing/approving the request.
+    try:
+        await context.bot.send_message(
+            chat_id=join_request.user_chat_id,
+            text=welcome_text,
+            reply_markup=keyboard
+        )
+    except Exception:
+        logger.exception(
+            "Could not send welcome DM to join requester %s", user.id
+        )
+
+    try:
+        await context.bot.approve_chat_join_request(
+            chat_id=join_request.chat.id,
+            user_id=user.id
+        )
+        logger.info(
+            "Approved channel join request for user %s in chat %s",
+            user.id, join_request.chat.id
+        )
+    except Exception:
+        logger.exception(
+            "Could not approve join request for user %s in chat %s",
+            user.id, join_request.chat.id
+        )
 
 
 # ---------------- NEW MATCH ----------------
@@ -271,14 +337,14 @@ async def newmatch(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await set_setting("current_cycle", cycle_id)
 
         await update.message.reply_text(
-            "🆕 NEW MATCH CYCLE STARTED!\n\n"
-            "✅ Previous approvals are now expired.\n"
-            "🔒 All users must verify again.\n\n"
+            "ðŸ†• NEW MATCH CYCLE STARTED!\n\n"
+            "âœ… Previous approvals are now expired.\n"
+            "ðŸ”’ All users must verify again.\n\n"
             "Now use /setreel to add the new Instagram reel link."
         )
 
     except Exception as e:
-        await update.message.reply_text(f"❌ Error: {e}")
+        await update.message.reply_text(f"âŒ Error: {e}")
 
 
 # ---------------- INSTAGRAM REEL COMMANDS ----------------
@@ -291,7 +357,7 @@ async def setreel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data["set_reel"] = True
 
     await update.message.reply_text(
-        "📸 Send the Instagram reel link now.\n\n"
+        "ðŸ“¸ Send the Instagram reel link now.\n\n"
         "Example: https://www.instagram.com/reel/XXXXXXXX/"
     )
 
@@ -304,7 +370,7 @@ async def showreel(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text(
         f"Current Instagram reel:\n{link}" if link
-        else "❌ No Instagram reel link is set."
+        else "âŒ No Instagram reel link is set."
     )
 
 
@@ -315,10 +381,10 @@ async def removereel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         await delete_setting("reel_url")
         await update.message.reply_text(
-            "✅ Instagram reel link removed."
+            "âœ… Instagram reel link removed."
         )
     except Exception as e:
-        await update.message.reply_text(f"❌ Error: {e}")
+        await update.message.reply_text(f"âŒ Error: {e}")
 
 
 async def pending(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -338,11 +404,11 @@ async def pending(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         if not data:
             await update.message.reply_text(
-                "✅ No pending verification requests."
+                "âœ… No pending verification requests."
             )
             return
 
-        lines = ["📋 PENDING VERIFICATIONS:\n"]
+        lines = ["ðŸ“‹ PENDING VERIFICATIONS:\n"]
 
         for item in data:
             lines.append(
@@ -352,7 +418,7 @@ async def pending(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("\n".join(lines))
 
     except Exception as e:
-        await update.message.reply_text(f"❌ Error: {e}")
+        await update.message.reply_text(f"âŒ Error: {e}")
 
 
 # ---------------- STATS ----------------
@@ -378,7 +444,7 @@ async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
         approved_count = len(data or [])
 
     await update.message.reply_text(
-        f"📊 KAPTAAN CHOUDHARY STATS\n\n"
+        f"ðŸ“Š KAPTAAN CHOUDHARY STATS\n\n"
         f"Total users: {len(users)}\n"
         f"Current match approvals: {approved_count}"
     )
@@ -416,7 +482,7 @@ async def settoss(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data["set_message_for"] = "toss"
 
     await update.message.reply_text(
-        "🏏 Send your TOSS message now."
+        "ðŸ Send your TOSS message now."
     )
 
 
@@ -428,7 +494,7 @@ async def setmatch(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data["set_message_for"] = "match"
 
     await update.message.reply_text(
-        "🏆 Send your MATCH WINNER message now."
+        "ðŸ† Send your MATCH WINNER message now."
     )
 
 
@@ -439,10 +505,10 @@ async def canceltoss(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         await delete_auto_message("toss")
         await update.message.reply_text(
-            "✅ Toss auto-reply deactivated."
+            "âœ… Toss auto-reply deactivated."
         )
     except Exception as e:
-        await update.message.reply_text(f"❌ Error: {e}")
+        await update.message.reply_text(f"âŒ Error: {e}")
 
 
 async def cancelmatch(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -452,10 +518,10 @@ async def cancelmatch(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         await delete_auto_message("match")
         await update.message.reply_text(
-            "✅ Match auto-reply deactivated."
+            "âœ… Match auto-reply deactivated."
         )
     except Exception as e:
-        await update.message.reply_text(f"❌ Error: {e}")
+        await update.message.reply_text(f"âŒ Error: {e}")
 
 
 # ---------------- USER TOSS / MATCH REQUEST ----------------
@@ -507,19 +573,19 @@ async def request_prediction(update, context, request_type):
 
     if existing:
         await msg.reply_text(
-            "⏳ Your screenshot is already waiting for admin approval."
+            "â³ Your screenshot is already waiting for admin approval."
         )
         return
 
     await save_session(user.id, cycle, request_type)
 
     await msg.reply_text(
-        "🔒 INSTAGRAM LIKE VERIFICATION\n\n"
+        "ðŸ”’ INSTAGRAM LIKE VERIFICATION\n\n"
         "1. Open our Instagram reel.\n"
         "2. Like the reel.\n"
         "3. Take a screenshot showing your like.\n"
         "4. Send that screenshot here.\n\n"
-        f"📸 Reel link:\n{reel}\n\n"
+        f"ðŸ“¸ Reel link:\n{reel}\n\n"
         "Your Toss and Match access will unlock after admin approval."
     )
 
@@ -548,7 +614,7 @@ async def submit_screenshot(update, context):
 
     if existing:
         await msg.reply_text(
-            "⏳ Your screenshot is already waiting for approval."
+            "â³ Your screenshot is already waiting for approval."
         )
         return True
 
@@ -572,11 +638,11 @@ async def submit_screenshot(update, context):
 
         keyboard = [[
             InlineKeyboardButton(
-                "✅ Approve",
+                "âœ… Approve",
                 callback_data=f"approve:{request_id}"
             ),
             InlineKeyboardButton(
-                "❌ Reject",
+                "âŒ Reject",
                 callback_data=f"reject:{request_id}"
             )
         ]]
@@ -584,7 +650,7 @@ async def submit_screenshot(update, context):
         await context.bot.send_message(
             chat_id=ADMIN_ID,
             text=(
-                "📸 NEW INSTAGRAM VERIFICATION\n\n"
+                "ðŸ“¸ NEW INSTAGRAM VERIFICATION\n\n"
                 f"Request ID: {request_id}\n"
                 f"Name: {user.full_name}\n"
                 f"Username: @{user.username if user.username else 'No username'}\n"
@@ -602,13 +668,13 @@ async def submit_screenshot(update, context):
         )
 
         await msg.reply_text(
-            "✅ Screenshot submitted successfully!\n"
+            "âœ… Screenshot submitted successfully!\n"
             "Please wait for admin approval."
         )
 
     except Exception as e:
         await msg.reply_text(
-            f"❌ Screenshot submission failed: {e}"
+            f"âŒ Screenshot submission failed: {e}"
         )
 
     return True
@@ -634,7 +700,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 or link.startswith("https://instagram.com/")
             ):
                 await msg.reply_text(
-                    "❌ Please send a valid Instagram URL."
+                    "âŒ Please send a valid Instagram URL."
                 )
                 return
 
@@ -643,10 +709,10 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 context.user_data.pop("set_reel", None)
 
                 await msg.reply_text(
-                    "✅ Instagram reel link saved successfully!"
+                    "âœ… Instagram reel link saved successfully!"
                 )
             except Exception as e:
-                await msg.reply_text(f"❌ Error: {e}")
+                await msg.reply_text(f"âŒ Error: {e}")
 
             return
 
@@ -663,10 +729,10 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 context.user_data.pop("set_message_for", None)
 
                 await msg.reply_text(
-                    f"✅ {setting.upper()} message saved successfully!"
+                    f"âœ… {setting.upper()} message saved successfully!"
                 )
             except Exception as e:
-                await msg.reply_text(f"❌ Error: {e}")
+                await msg.reply_text(f"âŒ Error: {e}")
 
             return
 
@@ -678,11 +744,11 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             keyboard = [[
                 InlineKeyboardButton(
-                    "✅ Send to all",
+                    "âœ… Send to all",
                     callback_data="confirm_broadcast"
                 ),
                 InlineKeyboardButton(
-                    "❌ Cancel",
+                    "âŒ Cancel",
                     callback_data="cancel_broadcast"
                 )
             ]]
@@ -702,7 +768,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     from_chat_id=msg.chat_id,
                     message_id=msg.message_id
                 )
-                await msg.reply_text("✅ Reply sent.")
+                await msg.reply_text("âœ… Reply sent.")
             except Exception as e:
                 await msg.reply_text(f"Could not send: {e}")
 
@@ -747,7 +813,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     keyboard = [[
         InlineKeyboardButton(
-            "↩️ Reply to user",
+            "â†©ï¸ Reply to user",
             callback_data=f"reply:{user.id}"
         )
     ]]
@@ -755,7 +821,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await context.bot.send_message(
         chat_id=ADMIN_ID,
         text=(
-            f"📩 NEW USER MESSAGE\n\n"
+            f"ðŸ“© NEW USER MESSAGE\n\n"
             f"Name: {name}\n"
             f"Username: {username}\n"
             f"User ID: {user.id}"
@@ -804,10 +870,10 @@ async def send_broadcast(context, message_id, users):
 
     await context.bot.send_message(
         ADMIN_ID,
-        f"📊 BROADCAST REPORT\n\n"
-        f"👥 Total Users: {total}\n"
-        f"✅ Sent: {sent}\n"
-        f"❌ Failed: {failed}"
+        f"ðŸ“Š BROADCAST REPORT\n\n"
+        f"ðŸ‘¥ Total Users: {total}\n"
+        f"âœ… Sent: {sent}\n"
+        f"âŒ Failed: {failed}"
     )
     
 # ---------------- BUTTONS ----------------
@@ -848,7 +914,7 @@ async def buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if request["cycle_id"] != current_cycle:
                 await update_request_status(request_id, "expired")
                 await query.edit_message_text(
-                    "⚠️ This request belongs to an old match. Approval expired."
+                    "âš ï¸ This request belongs to an old match. Approval expired."
                 )
                 return
 
@@ -862,14 +928,14 @@ async def buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await context.bot.send_message(
                     chat_id=uid,
                     text=(
-                        "✅ INSTAGRAM VERIFICATION APPROVED!\n\n"
+                        "âœ… INSTAGRAM VERIFICATION APPROVED!\n\n"
                         "Your Toss and Match access is now unlocked "
-                        "for the current match. 🏏"
+                        "for the current match. ðŸ"
                     )
                 )
 
                 await query.edit_message_text(
-                    f"✅ APPROVED\nRequest: {request_id}\nUser: {uid}"
+                    f"âœ… APPROVED\nRequest: {request_id}\nUser: {uid}"
                 )
 
             else:
@@ -878,19 +944,19 @@ async def buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await context.bot.send_message(
                     chat_id=uid,
                     text=(
-                        "❌ Your Instagram screenshot was rejected.\n\n"
+                        "âŒ Your Instagram screenshot was rejected.\n\n"
                         "Please send a clear screenshot showing that "
                         "you liked the reel."
                     )
                 )
 
                 await query.edit_message_text(
-                    f"❌ REJECTED\nRequest: {request_id}\nUser: {uid}"
+                    f"âŒ REJECTED\nRequest: {request_id}\nUser: {uid}"
                 )
 
         except Exception as e:
             await query.message.reply_text(
-                f"❌ Approval action failed: {e}"
+                f"âŒ Approval action failed: {e}"
             )
 
         return
@@ -907,7 +973,7 @@ async def buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await query.edit_message_text("No pending broadcast.")
             return
 
-        await query.edit_message_text("🚀 Broadcast started...")
+        await query.edit_message_text("ðŸš€ Broadcast started...")
 
         try:
             users = await get_users()
@@ -921,7 +987,7 @@ async def buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except Exception as e:
             await context.bot.send_message(
                 ADMIN_ID,
-                f"❌ Broadcast error: {e}"
+                f"âŒ Broadcast error: {e}"
             )
 
         return
@@ -954,6 +1020,7 @@ def main():
     )
 
     app.add_handler(CommandHandler("start", start))
+    app.add_handler(ChatJoinRequestHandler(handle_join_request))
     app.add_handler(CommandHandler("stats", stats))
     app.add_handler(CommandHandler("broadcast", broadcast))
     app.add_handler(CommandHandler("cancel", cancel))
@@ -985,7 +1052,8 @@ def main():
         port=port,
         url_path=webhook_secret,
         webhook_url=f"{render_url}/{webhook_secret}",
-        secret_token=webhook_secret
+        secret_token=webhook_secret,
+        allowed_updates=Update.ALL_TYPES
     )
 
 
