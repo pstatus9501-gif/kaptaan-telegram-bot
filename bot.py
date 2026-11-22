@@ -260,14 +260,16 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if context.args and context.args[0] == "welcome":
         await update.message.reply_text(
-            "âœ… You're connected with Kaptaan Choudhary! ðŸ\n\n"
-            "You can now receive personal updates and important announcements here. "
-            "Send Toss or Match whenever you need the latest update."
+            "\u2705 You're connected with Kaptaan Choudhary! "
+            "\U0001F3CF\n\n"
+            "You can now receive personal updates and important "
+            "announcements here. Send Toss or Match whenever you "
+            "need the latest update."
         )
         return
 
     await update.message.reply_text(
-        "Welcome to Kaptaan Choudhary! ðŸ\n"
+        "Welcome to Kaptaan Choudhary! \U0001F3CF\n"
         "Send Toss or Match to request the latest update."
     )
 
