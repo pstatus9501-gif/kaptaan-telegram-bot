@@ -283,18 +283,18 @@ async def handle_join_request(update: Update, context: ContextTypes.DEFAULT_TYPE
     bot_info = await context.bot.get_me()
     start_link = f"https://t.me/{bot_info.username}?start=welcome"
 
-    welcome_text = (
-        "ðŸ‘‹ WELCOME TO KAPTAAN CHOUDHARY! ðŸ‘‘\n\n"
-        "Congratulations! Your channel join request is being approved. âœ…\n\n"
-        "ðŸ Welcome to our cricket community!\n\n"
+        welcome_text = (
+        "\U0001F44B WELCOME TO KAPTAAN CHOUDHARY! \U0001F451\n\n"
+        "Congratulations! Your channel join request is being approved. \u2705\n\n"
+        "\U0001F3CF Welcome to our cricket community!\n\n"
         "To receive personal updates, match notifications and important announcements, "
         "please start our official bot using the button below.\n\n"
-        "â¤ï¸ Thank you for joining us!\n\n"
-        "â€“ TEAM KAPTAAN CHOUDHARY"
+        "\u2764\uFE0F Thank you for joining us!\n\n"
+        "- TEAM KAPTAAN CHOUDHARY"
     )
 
     keyboard = InlineKeyboardMarkup([[
-        InlineKeyboardButton("ðŸš€ START NOW", url=start_link)
+        InlineKeyboardButton("\U0001F680 START NOW", url=start_link)
     ]])
 
     # Telegram provides user_chat_id temporarily for contacting a join requester.
